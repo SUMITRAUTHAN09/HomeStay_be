@@ -3,7 +3,7 @@ import Room from '../models/Room';
 import Booking from '../models/Booking';
 
 /**
- * @desc    Get all rooms
+ * @desc    Get all rooms (PUBLIC - only available rooms)
  * @route   GET /api/rooms
  * @access  Public
  */
@@ -11,11 +11,13 @@ export const getAllRooms = async (req: Request, res: Response): Promise<void> =>
   try {
     const { available, minPrice, maxPrice, capacity } = req.query;
 
-    // Build query
-    const query: any = {};
+    // Build query - ALWAYS filter for available rooms on public endpoint
+    const query: any = { isAvailable: true }; // ✅ CRITICAL: Only show available rooms
     
-    if (available === 'true') {
-      query.isAvailable = true;
+    if (available === 'false') {
+      // If explicitly requesting unavailable rooms, ignore the default filter
+      // This is for admin use only
+      delete query.isAvailable;
     }
     
     if (minPrice || maxPrice) {
@@ -33,7 +35,8 @@ export const getAllRooms = async (req: Request, res: Response): Promise<void> =>
     res.status(200).json({
       success: true,
       count: rooms.length,
-      rooms
+      rooms,
+      data: rooms // Also include as 'data' for consistency
     });
   } catch (error: any) {
     console.error('Get rooms error:', error);
@@ -45,12 +48,91 @@ export const getAllRooms = async (req: Request, res: Response): Promise<void> =>
 };
 
 /**
- * @desc    Get single room by ID
+ * @desc    Get ALL rooms (ADMIN - including unavailable)
+ * @route   GET /api/admin/rooms
+ * @access  Private (Admin only)
+ */
+export const getAllRoomsAdmin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { available, minPrice, maxPrice, capacity } = req.query;
+
+    // Build query - NO availability filter for admin
+    const query: any = {};
+    
+    if (available === 'true') {
+      query.isAvailable = true;
+    } else if (available === 'false') {
+      query.isAvailable = false;
+    }
+    
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
+    
+    if (capacity) {
+      query.capacity = { $gte: Number(capacity) };
+    }
+
+    const rooms = await Room.find(query).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: rooms.length,
+      rooms,
+      data: rooms // Also include as 'data' for consistency
+    });
+  } catch (error: any) {
+    console.error('Get all rooms (admin) error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * @desc    Get single room by ID (PUBLIC - only if available)
  * @route   GET /api/rooms/:id
  * @access  Public
  */
 export const getRoomById = async (req: Request, res: Response): Promise<void> => {
   try {
+    // ✅ Only return room if it's available (for public)
+    const room = await Room.findOne({ 
+      _id: req.params.id,
+      isAvailable: true 
+    });
+
+    if (!room) {
+      res.status(404).json({
+        success: false,
+        message: 'Room not found or not available'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { room }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * @desc    Get single room by ID (ADMIN - any room)
+ * @route   GET /api/admin/rooms/:id
+ * @access  Private (Admin only)
+ */
+export const getRoomByIdAdmin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Admin can see any room, regardless of availability
     const room = await Room.findById(req.params.id);
 
     if (!room) {
@@ -212,6 +294,8 @@ export const toggleRoomAvailability = async (req: Request, res: Response): Promi
     room.isAvailable = !room.isAvailable;
     await room.save();
 
+    console.log(`✅ Room ${room.name} availability toggled to: ${room.isAvailable}`);
+
     res.status(200).json({
       success: true,
       message: `Room ${room.isAvailable ? 'enabled' : 'disabled'} successfully`,
@@ -235,12 +319,16 @@ export const getRoomAvailability = async (req: Request, res: Response): Promise<
     const { id: roomId } = req.params;
     const { startDate } = req.query;
 
-    // Validate room exists
-    const room = await Room.findById(roomId);
+    // Validate room exists AND is available (for public)
+    const room = await Room.findOne({ 
+      _id: roomId,
+      isAvailable: true 
+    });
+    
     if (!room) {
       res.status(404).json({
         success: false,
-        message: 'Room not found'
+        message: 'Room not found or not available'
       });
       return;
     }
@@ -327,12 +415,16 @@ export const checkDateAvailability = async (req: Request, res: Response): Promis
       return;
     }
 
-    // Validate room exists
-    const room = await Room.findById(roomId);
+    // Validate room exists AND is available
+    const room = await Room.findOne({ 
+      _id: roomId,
+      isAvailable: true 
+    });
+    
     if (!room) {
       res.status(404).json({
         success: false,
-        message: 'Room not found'
+        message: 'Room not found or not available'
       });
       return;
     }

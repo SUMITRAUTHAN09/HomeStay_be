@@ -1,7 +1,9 @@
 import express from 'express';
 import {
   getAllRooms,
+  getAllRoomsAdmin,
   getRoomById,
+  getRoomByIdAdmin,
   createRoom,
   updateRoom,
   deleteRoom,
@@ -9,18 +11,40 @@ import {
   getRoomAvailability,
   checkDateAvailability
 } from '../controllers/roomController';
-import { protect, authorize } from '../middleware/authMiddleware';
+import { adminAuth } from '../middleware/adminAuth';
 
 const router = express.Router();
 
 /**
  * IMPORTANT: Specific routes MUST come before generic /:id routes
- * Otherwise Express will treat "availability" as an ID parameter
+ * Admin routes are now at the router level, not nested
  */
+
+// ========================================
+// ADMIN ROUTES (Protected) - at /rooms level
+// ========================================
+
+/**
+ * @route   GET /api/rooms/admin/all
+ * @desc    Get ALL rooms (including unavailable) - ADMIN ONLY
+ * @access  Private (Admin only)
+ */
+router.get('/admin/all', adminAuth, getAllRoomsAdmin);
+
+/**
+ * @route   GET /api/rooms/admin/:id
+ * @desc    Get single room by ID (any room) - ADMIN ONLY
+ * @access  Private (Admin only)
+ */
+router.get('/admin/:id', adminAuth, getRoomByIdAdmin);
+
+// ========================================
+// PUBLIC ROUTES
+// ========================================
 
 /**
  * @route   GET /api/rooms
- * @desc    Get all rooms (with optional filters)
+ * @desc    Get all AVAILABLE rooms (with optional filters)
  * @access  Public
  */
 router.get('/', getAllRooms);
@@ -30,17 +54,17 @@ router.get('/', getAllRooms);
  * @desc    Create new room
  * @access  Private (Admin only)
  */
-router.post('/', protect, authorize('admin'), createRoom);
+router.post('/', adminAuth, createRoom);
 
 /**
- * 🆕 @route   GET /api/rooms/:id/availability-calendar
+ * @route   GET /api/rooms/:id/availability-calendar
  * @desc    Get room availability calendar (30 days)
  * @access  Public
  */
 router.get('/:id/availability-calendar', getRoomAvailability);
 
 /**
- * 🆕 @route   GET /api/rooms/:id/check-dates
+ * @route   GET /api/rooms/:id/check-dates
  * @desc    Check if specific dates are available
  * @access  Public
  */
@@ -51,11 +75,11 @@ router.get('/:id/check-dates', checkDateAvailability);
  * @desc    Toggle room availability (enable/disable)
  * @access  Private (Admin only)
  */
-router.patch('/:id/toggle-availability', protect, authorize('admin'), toggleRoomAvailability);
+router.patch('/:id/toggle-availability', adminAuth, toggleRoomAvailability);
 
 /**
  * @route   GET /api/rooms/:id
- * @desc    Get single room by ID
+ * @desc    Get single AVAILABLE room by ID
  * @access  Public
  */
 router.get('/:id', getRoomById);
@@ -65,13 +89,13 @@ router.get('/:id', getRoomById);
  * @desc    Update room
  * @access  Private (Admin only)
  */
-router.put('/:id', protect, authorize('admin'), updateRoom);
+router.put('/:id', adminAuth, updateRoom);
 
 /**
  * @route   DELETE /api/rooms/:id
  * @desc    Delete room
  * @access  Private (Admin only)
  */
-router.delete('/:id', protect, authorize('admin'), deleteRoom);
+router.delete('/:id', adminAuth, deleteRoom);
 
 export default router;
