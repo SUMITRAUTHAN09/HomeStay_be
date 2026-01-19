@@ -1,3 +1,4 @@
+// src/routes/bookingRoutes.ts
 import express from 'express';
 import {
   createBooking,
@@ -8,9 +9,9 @@ import {
   deleteBooking,
   getMyBookings,
   checkAvailability
-} from '../controllers/bookingController';
+} from '../controllers/booking'; // ✅ UPDATED: Changed from '../controllers/bookingController'
 import { protect, authorize } from '../middleware/authMiddleware';
-import { adminAuth } from '../middleware/adminAuth'; // ✅ ADD THIS IMPORT
+import { adminAuth } from '../middleware/adminAuth';
 
 const router = express.Router();
 
@@ -38,35 +39,35 @@ router.post('/', createBooking);
 /**
  * @route   GET /api/bookings
  * @desc    Get all bookings with filters
- * @access  Private (Admin only) - ✅ CHANGED TO ADMIN AUTH
+ * @access  Private (Admin only)
  */
 router.get('/', adminAuth, getAllBookings);
 
 /**
  * @route   GET /api/bookings/:id
  * @desc    Get single booking by ID
- * @access  Private (Admin only) - ✅ CHANGED TO ADMIN AUTH
+ * @access  Private (Admin only)
  */
 router.get('/:id', adminAuth, getBookingById);
 
 /**
  * @route   PUT /api/bookings/:id
  * @desc    Update booking
- * @access  Private (Admin only) - ✅ CHANGED TO ADMIN AUTH
+ * @access  Private (Admin only)
  */
 router.put('/:id', adminAuth, updateBooking);
 
 /**
  * @route   PATCH /api/bookings/:id/cancel
  * @desc    Cancel a booking
- * @access  Private (Admin only) - ✅ CHANGED TO ADMIN AUTH
+ * @access  Private (Admin only)
  */
 router.patch('/:id/cancel', adminAuth, cancelBooking);
 
 /**
  * @route   DELETE /api/bookings/:id
  * @desc    Delete a booking
- * @access  Private (Admin only) - ✅ CHANGED TO ADMIN AUTH
+ * @access  Private (Admin only)
  */
 router.delete('/:id', adminAuth, deleteBooking);
 
