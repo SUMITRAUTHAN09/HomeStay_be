@@ -6,13 +6,21 @@ dotenv.config();
 
 const createAdmin = async () => {
   try {
+    // Get email from environment variable
+    const adminEmail = process.env.EMAIL_USER;
+    
+    if (!adminEmail) {
+      console.error('❌ EMAIL_USER is not set in .env file');
+      process.exit(1);
+    }
+
     // Connect to MongoDB
     const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/homestay';
     await mongoose.connect(mongoUri);
     console.log('✅ MongoDB Connected');
 
     // Check if admin already exists
-    const existingAdmin = await Admin.findOne({ email: 'agarwalnimish428@gmail.com' });
+    const existingAdmin = await Admin.findOne({ email: adminEmail });
     
     if (existingAdmin) {
       console.log('⚠️  Admin already exists!');
@@ -27,7 +35,7 @@ const createAdmin = async () => {
     // Create admin
     const admin = await Admin.create({
       name: 'Nimish Agarwal',
-      email: 'agarwalnimish428@gmail.com',
+      email: adminEmail,
       password: '123456',
       role: 'admin',
       isActive: true

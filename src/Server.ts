@@ -94,7 +94,7 @@ const verifyEmailService = async () => {
     
     if (isValid) {
       console.log('✅ Email service configured correctly');
-      console.log(`📬 Admin notifications will be sent to: findmyroom1@gmail.com`);
+      console.log(`📬 Admin notifications will be sent to: admin@aamantranstays.com`);
     } else {
       console.warn('⚠️ Email service configuration failed');
       console.warn('⚠️ Bookings will work but emails won\'t be sent');
