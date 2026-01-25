@@ -50,18 +50,16 @@ app.get('/', (_req: Request, res: Response) => {
 
 // Health check route
 app.get('/api/health', async (_req: Request, res: Response) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  
-  // Log connection details for debugging
-  console.log('MongoDB Connection State:', mongoose.connection.readyState);
-  console.log('MongoDB URI exists:', !!process.env.MONGODB_URI);
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  const dbStatus = states[mongoose.connection.readyState] || 'unknown';
   
   res.status(200).json({ 
     success: true,
     status: 'OK', 
     message: 'Server is running on Vercel',
     database: dbStatus,
-    connectionState: mongoose.connection.readyState,
+    readyState: mongoose.connection.readyState,
+    hasMongoUri: !!process.env.MONGODB_URI,
     timestamp: new Date().toISOString()
   });
 });
@@ -72,59 +70,68 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api', menuRoutes);
 
-// Database connection with better error handling
-let isConnecting = false;
+// Global MongoDB connection promise
+let connectionPromise: Promise<typeof mongoose> | null = null;
 
-const connectDB = async () => {
-  // If already connected, return
+const connectDB = async (): Promise<typeof mongoose> => {
+  // Return existing connection if already connected
   if (mongoose.connection.readyState === 1) {
-    console.log('✅ Already connected to MongoDB');
-    return;
+    console.log('✅ Using existing MongoDB connection');
+    return mongoose;
   }
 
-  // If connection is in progress, wait
-  if (isConnecting) {
-    console.log('⏳ Connection already in progress...');
-    return;
+  // Return existing connection attempt if in progress
+  if (connectionPromise) {
+    console.log('⏳ Waiting for existing connection attempt...');
+    return connectionPromise;
   }
 
-  try {
-    isConnecting = true;
-    const mongoURI = process.env.MONGODB_URI;
-    
-    if (!mongoURI) {
-      console.error('❌ MONGODB_URI is not defined');
-      throw new Error('MONGODB_URI is not defined in environment variables');
+  // Create new connection
+  connectionPromise = (async () => {
+    try {
+      const mongoURI = process.env.MONGODB_URI;
+      
+      if (!mongoURI) {
+        throw new Error('MONGODB_URI environment variable is not defined');
+      }
+
+      console.log('🔄 Initiating MongoDB connection...');
+      console.log('📍 Connecting to cluster:', mongoURI.includes('cluster0') ? 'cluster0' : 'unknown');
+      
+      const conn = await mongoose.connect(mongoURI, {
+        serverSelectionTimeoutMS: 30000, // Increased to 30 seconds
+        socketTimeoutMS: 45000,
+        family: 4, // Force IPv4
+        maxPoolSize: 10,
+        minPoolSize: 1,
+        retryWrites: true,
+        retryReads: true,
+        connectTimeoutMS: 30000, // Added explicit connect timeout
+      });
+
+      console.log('✅ MongoDB Connected Successfully');
+      console.log(`📊 Database: ${mongoose.connection.name}`);
+      console.log(`🔗 Host: ${mongoose.connection.host}`);
+      
+      // Verify email service (non-blocking)
+      verifyEmailService().catch(err => 
+        console.warn('⚠️ Email service verification failed:', err.message)
+      );
+      
+      return conn;
+    } catch (error: any) {
+      console.error('❌ MongoDB Connection Failed');
+      console.error('❌ Error name:', error.name);
+      console.error('❌ Error message:', error.message);
+      
+      // Reset connection promise on failure
+      connectionPromise = null;
+      
+      throw error;
     }
+  })();
 
-    console.log('🔄 Attempting MongoDB connection...');
-    console.log('📍 URI format check:', mongoURI.substring(0, 20) + '...');
-    
-    await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 15000,
-      socketTimeoutMS: 45000,
-      maxPoolSize: 10,
-      minPoolSize: 1,
-      retryWrites: true,
-      retryReads: true,
-    });
-
-    console.log('✅ MongoDB Connected Successfully');
-    console.log(`📊 Database: ${mongoose.connection.name}`);
-    
-    // Verify email service (non-blocking)
-    verifyEmailService().catch(err => 
-      console.warn('⚠️ Email service verification failed:', err.message)
-    );
-    
-  } catch (error: any) {
-    console.error('❌ MongoDB Connection Error:', error.message);
-    console.error('❌ Error name:', error.name);
-    console.error('❌ Full error:', error);
-    throw error;
-  } finally {
-    isConnecting = false;
-  }
+  return connectionPromise;
 };
 
 // Email service verification
@@ -142,6 +149,21 @@ const verifyEmailService = async () => {
     console.warn('⚠️ Email service verification error:', error);
   }
 };
+
+// Handle connection events
+mongoose.connection.on('connected', () => {
+  console.log('✅ Mongoose connected to MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ Mongoose connection error:', err);
+  connectionPromise = null; // Reset on error
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ Mongoose disconnected from MongoDB');
+  connectionPromise = null; // Reset on disconnect
+});
 
 // Global error handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -196,18 +218,21 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// Handler for Vercel
+// Main handler for Vercel
 const handler = async (req: any, res: any) => {
   try {
-    // Connect to DB on each request (with built-in caching via mongoose)
+    // Ensure database connection before handling request
     await connectDB();
+    
+    // Handle the request
     return app(req, res);
   } catch (error: any) {
     console.error('❌ Handler error:', error);
-    return res.status(500).json({
+    return res.status(503).json({
       success: false,
-      error: 'Database connection failed',
-      message: error.message || 'Unable to connect to database'
+      error: 'Service Unavailable',
+      message: 'Database connection failed. Please try again.',
+      details: error.message
     });
   }
 };
