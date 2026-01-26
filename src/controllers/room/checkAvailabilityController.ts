@@ -36,31 +36,53 @@ export const getRoomAvailability = async (req: Request, res: Response): Promise<
       status: { $in: ['pending', 'confirmed'] },
       checkIn: { $lt: end },
       checkOut: { $gt: start }
-    }).select('checkIn checkOut status');
+    }).select('checkIn checkOut status bookingReference');
 
     console.log(`📅 Found ${bookings.length} bookings for room ${roomId}`);
+    bookings.forEach(booking => {
+      console.log(`  - ${booking.bookingReference}: ${booking.checkIn.toISOString().split('T')[0]} to ${booking.checkOut.toISOString().split('T')[0]}`);
+    });
 
     const bookedDates = new Set<string>();
 
+    // ✅ FIX: Create a NEW Date object in each iteration
     bookings.forEach(booking => {
       const checkIn = new Date(booking.checkIn);
       const checkOut = new Date(booking.checkOut);
       
-      for (let d = new Date(checkIn); d < checkOut; d.setDate(d.getDate() + 1)) {
-        bookedDates.add(d.toISOString().split('T')[0]);
+      // Create a new Date object for the current day
+      const currentDate = new Date(checkIn);
+      
+      // Loop through each day in the booking range
+      while (currentDate < checkOut) {
+        bookedDates.add(currentDate.toISOString().split('T')[0]);
+        // Create a NEW date for the next iteration
+        currentDate.setDate(currentDate.getDate() + 1);
       }
     });
 
     console.log(`🔴 Total booked dates: ${bookedDates.size}`);
+    if (bookedDates.size > 0) {
+      console.log('🔴 Booked dates:', Array.from(bookedDates).sort());
+    }
 
     const availability = [];
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateString = d.toISOString().split('T')[0];
+    const calendarDate = new Date(start);
+    
+    // ✅ FIX: Create new Date object for calendar generation too
+    while (calendarDate <= end) {
+      const dateString = calendarDate.toISOString().split('T')[0];
       availability.push({
         date: dateString,
         available: !bookedDates.has(dateString)
       });
+      calendarDate.setDate(calendarDate.getDate() + 1);
     }
+
+    console.log(`📊 Generated ${availability.length} days of availability`);
+    const availableCount = availability.filter(d => d.available).length;
+    const bookedCount = availability.filter(d => !d.available).length;
+    console.log(`✅ Available: ${availableCount}, ❌ Booked: ${bookedCount}`);
 
     res.status(200).json({
       success: true,
