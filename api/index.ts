@@ -14,18 +14,18 @@ import { verifyEmailConfig } from '../src/utils/emailService';
 // Initialize Express app
 const app = express();
 
-// Middleware
+// Middleware - CORS with Cache-Control and Pragma headers allowed
 app.use(cors({
   origin: '*',
   credentials: false,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma']
 }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ ADD THIS: Disable caching for all API responses
+// ✅ Disable caching for all API responses
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.setHeader('Pragma', 'no-cache');
