@@ -1,3 +1,4 @@
+// src/services/bookingService.ts
 import Booking from '../models/Booking';
 import { sendBookingNotificationToAdmin } from '../utils/emailService';
 
@@ -7,7 +8,7 @@ interface CreateBookingData {
   checkIn: Date;
   checkOut: Date;
   guests: number;
-  children?: number; // ✅ ADDED - Optional field
+  children?: number;
   numberOfRooms: number;
   guestName: string;
   guestEmail: string;
@@ -26,7 +27,7 @@ interface UpdateBookingData {
   checkIn?: string;
   checkOut?: string;
   guests?: number;
-  children?: number; // ✅ ADDED - Optional field
+  children?: number;
   numberOfRooms?: number;
   status?: string;
   paymentStatus?: string;
@@ -100,7 +101,7 @@ export class BookingService {
       checkIn: data.checkIn,
       checkOut: data.checkOut,
       guests: Number(data.guests),
-      children: data.children !== undefined ? Number(data.children) : 0, // ✅ ADDED with default 0
+      children: data.children !== undefined ? Number(data.children) : 0,
       numberOfRooms: Number(data.numberOfRooms),
       guestName: data.guestName.trim(),
       guestEmail: data.guestEmail.trim().toLowerCase(),
@@ -173,6 +174,9 @@ export class BookingService {
     return booking;
   }
 
+  /**
+   * Send booking notification to EMAIL_USER (aamantranstays@gmail.com)
+   */
   static async sendBookingNotification(booking: any, room: any) {
     try {
       const adults = booking.guests - (booking.children || 0);
@@ -186,16 +190,17 @@ export class BookingService {
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
         guests: booking.guests,
-        children: booking.children || 0, // ✅ ADDED
-        adults: adults, // ✅ ADDED
-        numberOfRooms: booking.numberOfRooms, // ✅ ADDED
+        children: booking.children || 0,
+        adults: adults,
+        numberOfRooms: booking.numberOfRooms,
         nights: booking.nights,
         totalPrice: booking.totalPrice,
         specialRequests: booking.specialRequests
       });
-      console.log('📧 Admin notification email sent');
+      console.log('📧 Booking notification email sent to EMAIL_USER');
     } catch (emailError) {
       console.error('❌ Email notification failed:', emailError);
+      // Don't throw error - booking is already created
     }
   }
 }

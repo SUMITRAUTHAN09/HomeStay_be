@@ -1,3 +1,4 @@
+// src/controllers/booking/createBookingController.ts
 import { Request, Response } from 'express';
 import { BookingValidationService } from '../../services/bookingValidationService';
 import { BookingService } from '../../services/bookingService';
@@ -16,7 +17,7 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
       checkIn,
       checkOut,
       guests,
-      children = 0, // Optional field with default
+      children = 0,
       numberOfRooms,
       guestName,
       guestEmail,
@@ -33,7 +34,7 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
 
     console.log('📥 Received booking request:', {
       ...req.body,
-      guestPhone: guestPhone ? '***' + guestPhone.slice(-4) : undefined // Mask phone for logs
+      guestPhone: guestPhone ? '***' + guestPhone.slice(-4) : undefined
     });
 
     // ✅ Validate guest name (no numbers)
@@ -80,7 +81,7 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
     // ✅ Validate guest capacity based on room type
     const capacityValidation = BookingValidationService.validateGuestCapacityByRoomType(
       guests,
-      room.name // Room name is the type (e.g., "Family Suite")
+      room.name
     );
     if (!capacityValidation.isValid) {
       BookingValidationService.sendValidationError(res, capacityValidation);
@@ -97,7 +98,7 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // ✅ NEW: Validate sufficient rooms for guests (3 guests per room)
+    // ✅ Validate sufficient rooms for guests (3 guests per room)
     const requiredRooms = Math.ceil(guests / 3);
     if (numberOfRooms < requiredRooms) {
       res.status(400).json({
@@ -108,7 +109,7 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // ✅ NEW: Validate doesn't exceed max rooms for this type
+    // ✅ Validate doesn't exceed max rooms for this type
     const roomType = room.name as keyof typeof MAX_ROOMS_PER_TYPE;
     const maxRoomsForType = MAX_ROOMS_PER_TYPE[roomType];
     
@@ -125,7 +126,7 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
 
-    // ✅ UPDATED: Check if enough rooms are available (not just conflict check)
+    // ✅ Check if enough rooms are available
     const existingBookings = await Booking.find({
       room: roomId,
       status: { $in: ['pending', 'confirmed'] },
@@ -153,7 +154,6 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
       }
     });
 
-    // Find the maximum number of rooms booked on any single day
     const maxBookedRooms = bookingsPerDate.size > 0 
       ? Math.max(...Array.from(bookingsPerDate.values())) 
       : 0;
@@ -212,7 +212,7 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
       specialRequests: specialRequests || ''
     });
 
-    // Send notification email
+    // ✅ Send notification email to EMAIL_USER (aamantranstays@gmail.com)
     await BookingService.sendBookingNotification(booking, room);
 
     console.log('✅ Booking created successfully:', {
@@ -235,7 +235,6 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
   } catch (error: any) {
     console.error('❌ Create booking error:', error);
 
-    // Handle Mongoose validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((err: any) => err.message);
       res.status(400).json({
@@ -246,7 +245,6 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Handle duplicate booking reference
     if (error.code === 11000) {
       res.status(400).json({
         success: false,

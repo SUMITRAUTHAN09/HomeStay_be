@@ -1,3 +1,4 @@
+// src/utils/emailService.ts
 export {
   transporter,
   verifyEmailConfig,

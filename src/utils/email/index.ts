@@ -1,6 +1,6 @@
 // src/utils/email/index.ts
 import { transporter } from './config';
-import { generateBookingNotificationEmail, BookingEmailData } from './templates/bookingNotificationTemplate';
+import { bookingNotificationTemplate, BookingEmailData } from './templates/bookingNotificationTemplate';
 import { generateOTPEmail, OTPEmailData } from './templates/otpTemplate';
 
 // Re-export types
@@ -22,21 +22,27 @@ export const verifyEmailConfig = async (): Promise<boolean> => {
 };
 
 /**
- * Send booking notification to admin
+ * Send booking notification to admin email (EMAIL_USER)
  */
 export const sendBookingNotificationToAdmin = async (data: BookingEmailData): Promise<void> => {
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@aamantran.com';
+  // ✅ Use EMAIL_USER directly (aamantranstays@gmail.com)
+  const adminEmail = process.env.EMAIL_USER;
+  
+  if (!adminEmail) {
+    console.error('❌ EMAIL_USER not configured');
+    throw new Error('EMAIL_USER environment variable is not set');
+  }
   
   const mailOptions = {
-    from: `"Aamantran Homestay" <${process.env.EMAIL_USER}>`, 
-    to: adminEmail,
+    from: `"Aamantran Homestay" <${process.env.EMAIL_USER}>`,
+    to: adminEmail, // ✅ Goes to EMAIL_USER (aamantranstays@gmail.com)
     subject: `🏠 New Booking Received - ${data.bookingReference}`,
-    html: generateBookingNotificationEmail(data), 
+    html: bookingNotificationTemplate(data),
   };
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log('✅ Booking notification email sent to admin');
+    console.log(`✅ Booking notification email sent to ${adminEmail}`);
   } catch (error) {
     console.error('❌ Failed to send booking notification:', error);
     throw error;
@@ -48,7 +54,7 @@ export const sendBookingNotificationToAdmin = async (data: BookingEmailData): Pr
  */
 export const sendPasswordResetOTP = async (data: OTPEmailData): Promise<void> => {
   const mailOptions = {
-    from: `"Aamantran Homestay Admin" <${process.env.EMAIL_USER}>`, // ✅ Changed from GMAIL_USER
+    from: `"Aamantran Homestay Admin" <${process.env.EMAIL_USER}>`,
     to: data.email,
     subject: '🔐 Password Reset OTP - Aamantran Homestay Admin',
     html: generateOTPEmail(data),
