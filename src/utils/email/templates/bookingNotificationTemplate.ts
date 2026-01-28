@@ -73,7 +73,7 @@ export const bookingNotificationTemplate = (data: BookingEmailData): string => {
         .detail-label {
           font-weight: bold;
           color: #555;
-          margin-right:8px;
+          margin-right:8px; //add morgin for fix UI formet
         }
         .detail-value {
           color: #333;
